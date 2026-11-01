@@ -54,9 +54,9 @@
   <h2>① 先试试演示数据</h2>
   <p class="hint">下面是三位销售的样本报表，注意：三个人的表格格式各不相同（列名、列数、日期写法都不一样）。点「一键载入」就能看到系统怎么把它们统一统计出来。</p>
   <div class="samples">
-    <a href="张伟_销售报表.xlsx" download>⬇ 张伟的报表（样本）</a>
-    <a href="李娜_销售报表.xlsx" download>⬇ 李娜的报表（样本）</a>
-    <a href="王强_销售报表.xlsx" download>⬇ 王强的报表（样本）</a>
+    <button class="secondary" onclick="genSample('张伟')">⬇ 张伟的报表（样本）</button>
+    <button class="secondary" onclick="genSample('李娜')">⬇ 李娜的报表（样本）</button>
+    <button class="secondary" onclick="genSample('王强')">⬇ 王强的报表（样本）</button>
   </div>
   <button id="btnDemo">一键载入演示数据</button>
   <div class="msg" id="demoMsg"></div>
@@ -250,30 +250,26 @@ document.getElementById('btnImport').addEventListener('click', function() {
   document.getElementById('fileInput').value = '';
 });
 
-var SAMPLES = [
-  { person: '张伟', url: '张伟_销售报表.xlsx' },
-  { person: '李娜', url: '李娜_销售报表.xlsx' },
-  { person: '王强', url: '王强_销售报表.xlsx' }
-];
+var EMBED = {"张伟": [["日期", "客户名称", "产品", "数量", "单价", "金额"], ["2026-08-03", "广州明辉贸易", "智能手表 A1", 20, 299, 5980], ["2026-08-11", "深圳蓝途科技", "智能手表 A1", 15, 299, 4485], ["2026-08-19", "佛山宏达商行", "蓝牙耳机 B2", 50, 129, 6450], ["2026-08-26", "广州明辉贸易", "蓝牙耳机 B2", 30, 129, 3870], ["2026-09-02", "东莞鑫源电子", "智能手表 A1", 25, 299, 7475], ["2026-09-09", "深圳蓝途科技", "充电宝 C3", 80, 89, 7120], ["2026-09-16", "广州明辉贸易", "智能手表 A1", 10, 299, 2990], ["2026-09-23", "佛山宏达商行", "充电宝 C3", 60, 89, 5340], ["2026-10-06", "深圳蓝途科技", "智能手表 A1", 30, 299, 8970], ["2026-10-13", "东莞鑫源电子", "蓝牙耳机 B2", 40, 129, 5160], ["2026-10-20", "广州明辉贸易", "充电宝 C3", 45, 89, 4005], ["2026-10-27", "中山华丰实业", "智能手表 A1", 18, 299, 5382]], "李娜": [["成交日期", "公司名称", "商品", "销售额"], ["2026/8/5", "上海瑞丰商贸", "空气炸锅", 12600], ["2026/8/14", "杭州味全食品", "空气炸锅", 8900], ["2026/8/21", "上海瑞丰商贸", "破壁机", 15300], ["2026/9/3", "南京苏宁小店", "破壁机", 9800], ["2026/9/10", "杭州味全食品", "电饭煲", 7600], ["2026/9/18", "上海瑞丰商贸", "电饭煲", 11200], ["2026/9/25", "宁波乐购超市", "空气炸锅", 13400], ["2026/10/8", "南京苏宁小店", "空气炸锅", 10500], ["2026/10/15", "宁波乐购超市", "破壁机", 16800], ["2026/10/22", "杭州味全食品", "破壁机", 9200], ["2026/10/29", "上海瑞丰商贸", "空气炸锅", 14700]], "王强": [["时间", "客户", "品名", "数量", "总价（元）"], ["2026-08-06", "成都天府酒店", "商用咖啡机", 2, 23600], ["2026-08-17", "重庆山城餐饮", "商用咖啡机", 1, 11800], ["2026-08-28", "成都天府酒店", "磨豆机", 3, 5400], ["2026-09-07", "绵阳涪城食品", "磨豆机", 2, 3600], ["2026-09-15", "重庆山城餐饮", "商用咖啡机", 2, 23600], ["2026-09-24", "成都天府酒店", "制冰机", 1, 8600], ["2026-10-09", "绵阳涪城食品", "商用咖啡机", 1, 11800], ["2026-10-16", "成都天府酒店", "制冰机", 2, 17200], ["2026-10-26", "重庆山城餐饮", "磨豆机", 4, 7200]]};
+function genSample(person) {
+  var ws = XLSX.utils.aoa_to_sheet(EMBED[person]);
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '报表');
+  XLSX.writeFile(wb, person + '_销售报表.xlsx');
+}
 document.getElementById('btnDemo').addEventListener('click', function() {
   var msg = document.getElementById('demoMsg');
-  msg.textContent = '正在载入…';
-  var jobs = SAMPLES.map(function(s) {
-    return fetch(encodeURI(s.url)).then(function(r) { return r.arrayBuffer(); }).then(function(buf) {
-      var wb = XLSX.read(new Uint8Array(buf), { type: 'array', cellDates: true });
-      var parsed = sheetToRows(wb);
-      var res = rowsToRecords(s.person, parsed.rows, guessMap(parsed.headers));
-      return res.records;
-    });
+  records = [];
+  ['张伟', '李娜', '王强'].forEach(function(person) {
+    var ws = XLSX.utils.aoa_to_sheet(EMBED[person]);
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '报表');
+    var parsed = sheetToRows(wb);
+    var res = rowsToRecords(person, parsed.rows, guessMap(parsed.headers));
+    records = records.concat(res.records);
   });
-  Promise.all(jobs).then(function(lists) {
-    records = [];
-    lists.forEach(function(l) { records = records.concat(l); });
-    save(); render();
-    msg.innerHTML = '<span class="ok">演示数据已载入：共 ' + records.length + ' 条记录，下面的报告就是自动统计出来的。</span>';
-  }).catch(function() {
-    msg.innerHTML = '<span class="err">载入失败：请把上面三个样本下载下来，用②的上传功能逐个导入（效果一样）。</span>';
-  });
+  save(); render();
+  msg.innerHTML = '<span class="ok">演示数据已载入：共 ' + records.length + ' 条记录，下面的报告就是自动统计出来的。</span>';
 });
 
 document.getElementById('btnClear').addEventListener('click', function() {
