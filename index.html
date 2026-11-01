@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>销售报表统计 · 演示版</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: #f4f6f9; color: #222; padding: 14px; max-width: 760px; margin: 0 auto; }
+  h1 { font-size: 21px; margin: 6px 0 2px; }
+  .sub { color: #666; font-size: 13px; margin-bottom: 14px; }
+  .card { background: #fff; border-radius: 12px; padding: 14px; margin-bottom: 14px; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+  .card h2 { font-size: 16px; margin-bottom: 10px; }
+  .card p.hint { font-size: 13px; color: #666; margin-bottom: 10px; line-height: 1.5; }
+  button { background: #1a73e8; color: #fff; border: none; border-radius: 8px; padding: 10px 16px; font-size: 15px; cursor: pointer; }
+  button.secondary { background: #eef2f7; color: #1a73e8; }
+  button.danger { background: #fdecea; color: #c5221f; }
+  button:active { opacity: .8; }
+  input[type=text], select { font-size: 15px; padding: 9px; border: 1px solid #ccd3db; border-radius: 8px; width: 100%; margin-bottom: 10px; background: #fff; }
+  input[type=file] { font-size: 14px; margin: 6px 0 10px; width: 100%; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .row > * { flex: 1; min-width: 120px; }
+  .samples a { display: inline-block; margin: 0 8px 8px 0; color: #1a73e8; font-size: 14px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { padding: 7px 6px; border-bottom: 1px solid #edf0f3; text-align: right; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: #555; font-weight: 600; }
+  .scrollx { overflow-x: auto; }
+  .kpis { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+  .kpi { flex: 1; min-width: 100px; background: #f6f9ff; border-radius: 10px; padding: 10px; text-align: center; }
+  .kpi .num { font-size: 19px; font-weight: 700; color: #1a73e8; }
+  .kpi .lab { font-size: 12px; color: #666; margin-top: 2px; }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+  .chip { padding: 6px 13px; border-radius: 999px; background: #eef2f7; font-size: 14px; cursor: pointer; border: none; color: #333; }
+  .chip.on { background: #1a73e8; color: #fff; }
+  .bar-row { display: flex; align-items: center; gap: 8px; margin: 5px 0; font-size: 13px; }
+  .bar-row .who { width: 86px; flex-shrink: 0; color: #444; }
+  .bar-track { flex: 1; background: #eef2f7; border-radius: 6px; height: 18px; overflow: hidden; }
+  .bar-fill { height: 100%; background: #1a73e8; border-radius: 6px; }
+  .bar-row .val { width: 74px; text-align: right; flex-shrink: 0; font-weight: 600; }
+  .msg { font-size: 14px; margin-top: 8px; min-height: 20px; }
+  .ok { color: #137333; } .err { color: #c5221f; }
+  .mapgrid label { font-size: 13px; color: #555; display: block; margin-bottom: 2px; }
+  .hidden { display: none; }
+  .foot { color: #888; font-size: 12px; text-align: center; margin: 10px 0 20px; line-height: 1.6; }
+</style>
+</head>
+<body>
+<h1>销售报表统计 · 演示版</h1>
+<div class="sub">销售人员上传各自的 Excel 表格 → 系统自动解析统计 → 管理人员看汇总报告</div>
+
+<div class="card">
+  <h2>① 先试试演示数据</h2>
+  <p class="hint">下面是三位销售的样本报表，注意：三个人的表格格式各不相同（列名、列数、日期写法都不一样）。点「一键载入」就能看到系统怎么把它们统一统计出来。</p>
+  <div class="samples">
+    <a href="张伟_销售报表.xlsx" download>⬇ 张伟的报表（样本）</a>
+    <a href="李娜_销售报表.xlsx" download>⬇ 李娜的报表（样本）</a>
+    <a href="王强_销售报表.xlsx" download>⬇ 王强的报表（样本）</a>
+  </div>
+  <button id="btnDemo">一键载入演示数据</button>
+  <div class="msg" id="demoMsg"></div>
+</div>
+
+<div class="card">
+  <h2>② 上传一份报表</h2>
+  <label style="font-size:13px;color:#555;">这份报表是谁的？</label>
+  <input type="text" id="personName" list="people" placeholder="例如：张伟">
+  <datalist id="people"><option value="张伟"><option value="李娜"><option value="王强"></datalist>
+  <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
+  <div id="mapBox" class="hidden">
+    <p class="hint">系统按表头猜出了每列的用途，猜错了可以在这里改，改好点「确认导入」：</p>
+    <div class="mapgrid">
+      <div class="row">
+        <div><label>日期列</label><select id="mapDate"></select></div>
+        <div><label>客户列</label><select id="mapCustomer"></select></div>
+      </div>
+      <div class="row">
+        <div><label>产品列</label><select id="mapProduct"></select></div>
+        <div><label>数量列（可无）</label><select id="mapQty"></select></div>
+        <div><label>金额列</label><select id="mapAmount"></select></div>
+      </div>
+    </div>
+    <button id="btnImport">确认导入</button>
+  </div>
+  <div class="msg" id="upMsg"></div>
+</div>
+
+<div class="card">
+  <h2>③ 统计报告</h2>
+  <div class="chips" id="monthChips"></div>
+  <div class="kpis">
+    <div class="kpi"><div class="num" id="kTotal">¥0</div><div class="lab">总销售额</div></div>
+    <div class="kpi"><div class="num" id="kOrders">0</div><div class="lab">订单数</div></div>
+    <div class="kpi"><div class="num" id="kPeople">0</div><div class="lab">销售人数</div></div>
+  </div>
+  <h3 style="font-size:15px;margin:12px 0 6px;">销售排名</h3>
+  <div class="scrollx"><table id="rankTable">
+    <thead><tr><th>销售</th><th>订单</th><th>客户数</th><th>销售额</th></tr></thead>
+    <tbody></tbody>
+  </table></div>
+  <h3 style="font-size:15px;margin:14px 0 6px;">每人每月销售额</h3>
+  <div class="scrollx"><table id="matrixTable"></table></div>
+  <h3 style="font-size:15px;margin:14px 0 6px;">月度走势（按人）</h3>
+  <div id="trendBox"></div>
+  <h3 style="font-size:15px;margin:14px 0 6px;">最近导入的明细</h3>
+  <div class="scrollx"><table id="detailTable">
+    <thead><tr><th>销售</th><th>日期</th><th>客户</th><th>产品</th><th>金额</th></tr></thead>
+    <tbody></tbody>
+  </table></div>
+  <div style="margin-top:14px;"><button class="danger" id="btnClear">清空全部数据</button></div>
+</div>
+
+<div class="foot">演示版：数据只保存在这台设备的浏览器里，换设备看不到。<br>正式版将部署到腾讯云，多人共用、数据集中保存。</div>
+
+<script>
+var LS_KEY = 'salesDemoRecordsV1';
+var records = [];
+try { records = JSON.parse(localStorage.getItem(LS_KEY) || '[]'); } catch(e) { records = []; }
+var curMonth = 'ALL';
+var pending = null; // {person, rows, headers}
+
+function save() { localStorage.setItem(LS_KEY, JSON.stringify(records)); }
+function fmt(n) { return '¥' + Math.round(n).toLocaleString('zh-CN'); }
+
+function parseDate(v) {
+  if (v === null || v === undefined || v === '') return null;
+  if (v instanceof Date && !isNaN(v)) {
+    return v.getFullYear() + '-' + pad(v.getMonth()+1) + '-' + pad(v.getDate());
+  }
+  if (typeof v === 'number' && v > 30000 && v < 80000) {
+    var d = XLSX.SSF.parse_date_code(v);
+    if (d) return d.y + '-' + pad(d.m) + '-' + pad(d.d);
+    return null;
+  }
+  var s = String(v).trim();
+  var m = s.match(/(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
+  if (m) return m[1] + '-' + pad(+m[2]) + '-' + pad(+m[3]);
+  m = s.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
+  if (m) return m[1] + '-' + pad(+m[2]) + '-' + pad(+m[3]);
+  return null;
+}
+function pad(n) { return (n < 10 ? '0' : '') + n; }
+function parseAmount(v) {
+  if (typeof v === 'number') return isNaN(v) ? null : v;
+  if (v === null || v === undefined) return null;
+  var s = String(v).replace(/[¥￥,\s]/g, '');
+  var n = parseFloat(s);
+  return isNaN(n) ? null : n;
+}
+
+var GUESS = [
+  { key: 'date',     re: /日期|时间|date/i },
+  { key: 'customer', re: /客户|公司|customer/i },
+  { key: 'product',  re: /产品|商品|品名|货品|product/i },
+  { key: 'qty',      re: /数量|件数|qty/i },
+  { key: 'amount',   re: /金额|销售额|总价|合计|小计|amount|total/i, not: /单价/ }
+];
+function guessMap(headers) {
+  var map = { date: -1, customer: -1, product: -1, qty: -1, amount: -1 };
+  GUESS.forEach(function(g) {
+    for (var i = 0; i < headers.length; i++) {
+      var h = String(headers[i] || '');
+      if (g.re.test(h) && !(g.not && g.not.test(h))) { map[g.key] = i; break; }
+    }
+  });
+  return map;
+}
+function rowsToRecords(person, rows, map) {
+  var out = [], skipped = 0;
+  rows.forEach(function(r) {
+    var date = map.date >= 0 ? parseDate(r[map.date]) : null;
+    var amount = map.amount >= 0 ? parseAmount(r[map.amount]) : null;
+    if (!date || amount === null) { skipped++; return; }
+    out.push({
+      person: person,
+      date: date,
+      month: date.slice(0, 7),
+      customer: map.customer >= 0 ? String(r[map.customer] || '') : '',
+      product: map.product >= 0 ? String(r[map.product] || '') : '',
+      qty: map.qty >= 0 ? (parseAmount(r[map.qty]) || 0) : 0,
+      amount: amount
+    });
+  });
+  return { records: out, skipped: skipped };
+}
+function sheetToRows(wb) {
+  var ws = wb.Sheets[wb.SheetNames[0]];
+  var arr = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, cellDates: true });
+  arr = arr.filter(function(r) { return r && r.some(function(c) { return c !== null && c !== undefined && String(c) !== ''; }); });
+  if (!arr.length) return null;
+  return { headers: arr[0].map(function(h) { return String(h); }), rows: arr.slice(1) };
+}
+
+function fillSelect(sel, headers, chosen, allowNone) {
+  sel.innerHTML = '';
+  if (allowNone) {
+    var o0 = document.createElement('option'); o0.value = -1; o0.textContent = '（无此列）'; sel.appendChild(o0);
+  }
+  headers.forEach(function(h, i) {
+    var o = document.createElement('option'); o.value = i; o.textContent = h || ('第' + (i+1) + '列'); sel.appendChild(o);
+  });
+  sel.value = chosen;
+}
+
+document.getElementById('fileInput').addEventListener('change', function(e) {
+  var f = e.target.files[0];
+  var msg = document.getElementById('upMsg');
+  document.getElementById('mapBox').classList.add('hidden');
+  if (!f) return;
+  var person = document.getElementById('personName').value.trim();
+  if (!person) { msg.innerHTML = '<span class="err">先填这份报表是谁的，再选文件。</span>'; e.target.value=''; return; }
+  var rd = new FileReader();
+  rd.onload = function(ev) {
+    try {
+      var wb = XLSX.read(new Uint8Array(ev.target.result), { type: 'array', cellDates: true });
+      var parsed = sheetToRows(wb);
+      if (!parsed) { msg.innerHTML = '<span class="err">这个文件里没读到数据。</span>'; return; }
+      pending = { person: person, headers: parsed.headers, rows: parsed.rows };
+      var g = guessMap(parsed.headers);
+      fillSelect(document.getElementById('mapDate'), parsed.headers, g.date, false);
+      fillSelect(document.getElementById('mapCustomer'), parsed.headers, g.customer, false);
+      fillSelect(document.getElementById('mapProduct'), parsed.headers, g.product, false);
+      fillSelect(document.getElementById('mapQty'), parsed.headers, g.qty, true);
+      fillSelect(document.getElementById('mapAmount'), parsed.headers, g.amount, false);
+      document.getElementById('mapBox').classList.remove('hidden');
+      msg.innerHTML = '已读到 ' + parsed.rows.length + ' 行，请核对列对应后点「确认导入」。';
+    } catch (err) {
+      msg.innerHTML = '<span class="err">文件读取失败，换一份试试。</span>';
+    }
+  };
+  rd.readAsArrayBuffer(f);
+});
+
+document.getElementById('btnImport').addEventListener('click', function() {
+  if (!pending) return;
+  var map = {
+    date: +document.getElementById('mapDate').value,
+    customer: +document.getElementById('mapCustomer').value,
+    product: +document.getElementById('mapProduct').value,
+    qty: +document.getElementById('mapQty').value,
+    amount: +document.getElementById('mapAmount').value
+  };
+  var res = rowsToRecords(pending.person, pending.rows, map);
+  records = records.concat(res.records);
+  save(); render();
+  document.getElementById('upMsg').innerHTML = '<span class="ok">已导入 ' + res.records.length + ' 条（' + pending.person + '）' + (res.skipped ? '，跳过 ' + res.skipped + ' 行无效数据' : '') + '。</span>';
+  document.getElementById('mapBox').classList.add('hidden');
+  pending = null;
+  document.getElementById('fileInput').value = '';
+});
+
+var SAMPLES = [
+  { person: '张伟', url: '张伟_销售报表.xlsx' },
+  { person: '李娜', url: '李娜_销售报表.xlsx' },
+  { person: '王强', url: '王强_销售报表.xlsx' }
+];
+document.getElementById('btnDemo').addEventListener('click', function() {
+  var msg = document.getElementById('demoMsg');
+  msg.textContent = '正在载入…';
+  var jobs = SAMPLES.map(function(s) {
+    return fetch(encodeURI(s.url)).then(function(r) { return r.arrayBuffer(); }).then(function(buf) {
+      var wb = XLSX.read(new Uint8Array(buf), { type: 'array', cellDates: true });
+      var parsed = sheetToRows(wb);
+      var res = rowsToRecords(s.person, parsed.rows, guessMap(parsed.headers));
+      return res.records;
+    });
+  });
+  Promise.all(jobs).then(function(lists) {
+    records = [];
+    lists.forEach(function(l) { records = records.concat(l); });
+    save(); render();
+    msg.innerHTML = '<span class="ok">演示数据已载入：共 ' + records.length + ' 条记录，下面的报告就是自动统计出来的。</span>';
+  }).catch(function() {
+    msg.innerHTML = '<span class="err">载入失败：请把上面三个样本下载下来，用②的上传功能逐个导入（效果一样）。</span>';
+  });
+});
+
+document.getElementById('btnClear').addEventListener('click', function() {
+  if (confirm('确定清空全部已导入数据？')) { records = []; curMonth = 'ALL'; save(); render(); }
+});
+
+function months() {
+  var set = {};
+  records.forEach(function(r) { set[r.month] = 1; });
+  return Object.keys(set).sort();
+}
+function render() {
+  var ms = months();
+  var chips = document.getElementById('monthChips');
+  chips.innerHTML = '';
+  ['ALL'].concat(ms).forEach(function(m) {
+    var b = document.createElement('button');
+    b.className = 'chip' + (curMonth === m ? ' on' : '');
+    b.textContent = m === 'ALL' ? '全部月份' : m;
+    b.onclick = function() { curMonth = m; render(); };
+    chips.appendChild(b);
+  });
+  var scoped = curMonth === 'ALL' ? records : records.filter(function(r) { return r.month === curMonth; });
+
+  var total = scoped.reduce(function(s, r) { return s + r.amount; }, 0);
+  document.getElementById('kTotal').textContent = fmt(total);
+  document.getElementById('kOrders').textContent = scoped.length;
+  var ppl = {};
+  scoped.forEach(function(r) { ppl[r.person] = 1; });
+  document.getElementById('kPeople').textContent = Object.keys(ppl).length;
+
+  var byPerson = {};
+  scoped.forEach(function(r) {
+    var p = byPerson[r.person] = byPerson[r.person] || { orders: 0, amount: 0, cust: {} };
+    p.orders++; p.amount += r.amount; if (r.customer) p.cust[r.customer] = 1;
+  });
+  var rank = Object.keys(byPerson).map(function(name) {
+    return { name: name, orders: byPerson[name].orders, amount: byPerson[name].amount, cust: Object.keys(byPerson[name].cust).length };
+  }).sort(function(a, b) { return b.amount - a.amount; });
+  document.querySelector('#rankTable tbody').innerHTML = rank.map(function(r, i) {
+    return '<tr><td>' + (i+1) + '. ' + esc(r.name) + '</td><td>' + r.orders + '</td><td>' + r.cust + '</td><td>' + fmt(r.amount) + '</td></tr>';
+  }).join('') || '<tr><td colspan="4" style="text-align:center;color:#999;">暂无数据</td></tr>';
+
+  var persons = Object.keys(byPerson).length ? rank.map(function(r) { return r.name; }) :
+    (function(){ var s={}; records.forEach(function(r){s[r.person]=1;}); return Object.keys(s); })();
+  var mt = document.getElementById('matrixTable');
+  var html = '<thead><tr><th>销售</th>' + ms.map(function(m) { return '<th>' + m + '</th>'; }).join('') + '<th>合计</th></tr></thead><tbody>';
+  persons.forEach(function(name) {
+    var rowSum = 0;
+    html += '<tr><td>' + esc(name) + '</td>' + ms.map(function(m) {
+      var v = records.filter(function(r) { return r.person === name && r.month === m; })
+                     .reduce(function(s, r) { return s + r.amount; }, 0);
+      rowSum += v;
+      return '<td>' + (v ? fmt(v) : '—') + '</td>';
+    }).join('') + '<td><b>' + fmt(rowSum) + '</b></td></tr>';
+  });
+  html += '</tbody>';
+  mt.innerHTML = persons.length ? html : '<tbody><tr><td style="color:#999;">暂无数据</td></tr></tbody>';
+
+  var tb = document.getElementById('trendBox');
+  if (!persons.length || !ms.length) { tb.innerHTML = '<div style="color:#999;font-size:13px;">暂无数据</div>'; }
+  else {
+    var max = 0;
+    persons.forEach(function(name) { ms.forEach(function(m) {
+      var v = records.filter(function(r) { return r.person === name && r.month === m; }).reduce(function(s, r) { return s + r.amount; }, 0);
+      if (v > max) max = v;
+    });});
+    tb.innerHTML = persons.map(function(name) {
+      return ms.map(function(m) {
+        var v = records.filter(function(r) { return r.person === name && r.month === m; }).reduce(function(s, r) { return s + r.amount; }, 0);
+        var w = max ? Math.round(v / max * 100) : 0;
+        return '<div class="bar-row"><div class="who">' + esc(name) + ' ' + m.slice(5) + '月</div><div class="bar-track"><div class="bar-fill" style="width:' + w + '%"></div></div><div class="val">' + fmt(v) + '</div></div>';
+      }).join('');
+    }).join('');
+  }
+
+  var det = records.slice(-10).reverse();
+  document.querySelector('#detailTable tbody').innerHTML = det.map(function(r) {
+    return '<tr><td>' + esc(r.person) + '</td><td>' + r.date + '</td><td>' + esc(r.customer) + '</td><td>' + esc(r.product) + '</td><td>' + fmt(r.amount) + '</td></tr>';
+  }).join('') || '<tr><td colspan="5" style="text-align:center;color:#999;">暂无数据</td></tr>';
+}
+function esc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+render();
+</script>
+</body>
+</html>
